@@ -1,0 +1,7 @@
+/messanger-backend/target/
+*.env
+
+# Ignore IDE specific files
+.vscode/
+.idea/
+

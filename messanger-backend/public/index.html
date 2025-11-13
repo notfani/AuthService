@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Messenger</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        #app { max-width: 800px; margin: 0 auto; padding: 20px; }
+        input, button { padding: 8px; margin: 4px; }
+        #messages { border: 1px solid #ccc; height: 300px; overflow-y: scroll; padding: 10px; margin: 10px 0; }
+        .message { margin: 5px 0; padding: 5px; background-color: #f0f0f0; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <h1>Simple Messenger</h1>
+
+    <!-- Auth -->
+    <div id="auth">
+        <h2>Register / Login</h2>
+        <input type="text" id="username" placeholder="Username" />
+        <input type="password" id="password" placeholder="Password" />
+        <button onclick="register()">Register</button>
+        <button onclick="login()">Login</button>
+    </div>
+
+    <!-- Chat -->
+    <div id="chat" style="display:none;">
+        <h2>Chat</h2>
+
+        <div>
+            <input type="text" id="group_id" placeholder="Group ID" />
+            <input type="text" id="receiver_id" placeholder="Receiver ID (for private)" />
+            <input type="text" id="message_input" placeholder="Type a message..." />
+            <button onclick="sendPrivate()">Send Private</button>
+            <button onclick="sendGroup()">Send Group</button>
+        </div>
+
+        <div>
+            <input type="text" id="history_chat_id" placeholder="Chat ID (for history)" />
+            <select id="history_type">
+                <option value="group">Group</option>
+                <option value="private">Private</option>
+            </select>
+            <button onclick="loadHistory()">Load History</button>
+        </div>
+
+        <div id="messages"></div>
+    </div>
+</div>
+
+<script>
+    let token = null;
+    let ws = null;
+
+    function register() {
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+
+        fetch('/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        })
+            .then(res => res.json())
+            .then(data => {
+                alert('User registered, token: ' + data.access_token);
+                token = data.access_token;
+                localStorage.setItem('token', token);
+                document.getElementById('auth').style.display = 'none';
+                document.getElementById('chat').style.display = 'block';
+                connectWebSocket();
+            });
+    }
+
+    function login() {
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+
+        fetch('/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        })
+            .then(res => res.json())
+            .then(data => {
+                token = data.access_token;
+                localStorage.setItem('token', token);
+                document.getElementById('auth').style.display = 'none';
+                document.getElementById('chat').style.display = 'block';
+                connectWebSocket();
+            });
+    }
+
+    function connectWebSocket() {
+        if (ws) ws.close();
+        ws = new WebSocket(`ws://localhost:8000/ws?token=${token}`);
+
+        ws.onopen = () => console.log('Connected to WebSocket');
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            addMessageToChat(data);
+        };
+    }
+
+    function sendPrivate() {
+        const receiver_id = document.getElementById('receiver_id').value;
+        const content = document.getElementById('message_input').value;
+
+        ws.send(JSON.stringify({
+            type: 'private',
+            to: receiver_id,
+            content: content
+        }));
+        document.getElementById('message_input').value = '';
+    }
+
+    function sendGroup() {
+        const group_id = document.getElementById('group_id').value;
+        const content = document.getElementById('message_input').value;
+
+        ws.send(JSON.stringify({
+            type: 'group',
+            to: group_id,
+            content: content
+        }));
+        document.getElementById('message_input').value = '';
+    }
+
+    function addMessageToChat(msg) {
+        const div = document.createElement('div');
+        div.className = 'message';
+        div.textContent = `[${msg.sent_at}] ${msg.from}: ${msg.content}`;
+        document.getElementById('messages').appendChild(div);
+        document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+    }
+
+    async function loadHistory() {
+        const chat_id = document.getElementById('history_chat_id').value;
+        const chat_type = document.getElementById('history_type').value;
+
+        const res = await fetch(`/messages/history?chat_id=${chat_id}&chat_type=${chat_type}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const messages = await res.json();
+
+        const container = document.getElementById('messages');
+        container.innerHTML = '';
+        messages.forEach(msg => {
+            const div = document.createElement('div');
+            div.className = 'message';
+            div.textContent = `[${msg.sent_at}] ${msg.sender_id}: ${msg.content}`;
+            container.appendChild(div);
+        });
+    }
+
+    // Check if token exists on load
+    window.onload = () => {
+        token = localStorage.getItem('token');
+        if (token) {
+            document.getElementById('auth').style.display = 'none';
+            document.getElementById('chat').style.display = 'block';
+            connectWebSocket();
+        }
+    };
+</script>
+
+</body>
+</html>
