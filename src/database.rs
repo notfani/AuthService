@@ -34,7 +34,7 @@ pub async fn run_migrations(pool: &Pool<Postgres>) -> Result<(), sqlx::Error> {
         .execute(pool)
         .await?;
 
-    println!("✅ Миграции успешно применены");
+    println!("Миграции успешно применены");
     Ok(())
 }
 

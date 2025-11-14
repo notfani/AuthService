@@ -16,17 +16,20 @@ pub struct User {
 }
 
 // DTO для регистрации пользователя
-#[derive(Debug, Deserialize, Validate)]
+use serde;
+
+#[derive(Debug, Clone, Validate, Deserialize, Serialize)]
 pub struct RegisterUserRequest {
-    #[validate(length(min = 3, max = 50, message = "Имя пользователя должно быть от 3 до 50 символов"))]
+    #[validate(length(min = 3, max = 50))]
     pub username: String,
 
-    #[validate(email(message = "Некорректный формат email"))]
+    #[validate(email)]
     pub email: String,
 
-    #[validate(length(min = 8, message = "Пароль должен содержать минимум 8 символов"))]
+    #[validate(length(min = 8))]
     pub password: String,
 }
+
 
 // DTO для ответа после регистрации
 #[derive(Debug, Serialize)]
